@@ -1,13 +1,16 @@
 require('dotenv').config();
 
+const readline = require('readline');
+
 const { buscarOfertas }                                    = require('./scraper');
 const { filtrarEsportes, filtrarPorPlataforma,
         filtrarDesconto, detectarPilar,
         ordenarPorPrioridade }                             = require('./filtro');
 const { formatarParaWhatsApp }                             = require('./formatador');
 const { gerarLinkAfiliado, statusAfiliados }               = require('./afiliados');
-const { filtrarNovos, marcarComoPostadas,
-        resetar, estatisticas }                            = require('./historico');
+const { filtrarNovos, adicionarPendentes,
+        marcarComoEnviadas, resetar,
+        estatisticas, mostrarResumo }                      = require('./historico');
 const fs   = require('fs');
 const path = require('path');
 
@@ -31,13 +34,21 @@ async function aplicarAfiliados(ofertas) {
   return prontas;
 }
 
+function confirmar(pergunta) {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.on('close', () => resolve('n'));
+    rl.question(pergunta, ans => { rl.close(); resolve(ans.trim().toLowerCase()); });
+  });
+}
+
 async function executar() {
   console.log('');
   console.log('🏃 BOT DE OFERTAS ESPORTIVAS — WhatsApp');
   console.log('═'.repeat(50));
   console.log('🔗 Plataformas:');
   console.log(statusAfiliados());
-  console.log(`\n📋 Histórico: ${estatisticas()}`);
+  console.log(`\n📋 Histórico: ${await estatisticas()}`);
   console.log('\n🔍 Buscando no Pelando.com.br...\n');
 
   try {
@@ -46,11 +57,9 @@ async function executar() {
     const comPlat     = filtrarPorPlataforma(esportivas);
     const comDesconto = filtrarDesconto(comPlat, 10);
 
-    // Detectar pilar e emoji de cada oferta
     const comPilar = comDesconto.map(o => ({ ...o, ...detectarPilar(o) }));
-    const novas    = filtrarNovos(comPilar);
+    const novas    = await filtrarNovos(comPilar);
 
-    // Agrupar por pilar e ordenar por prioridade dentro de cada grupo
     const grupos = {};
     for (const { id } of PILARES) {
       grupos[id] = ordenarPorPrioridade(novas.filter(o => o.pilar === id));
@@ -71,7 +80,6 @@ async function executar() {
       return;
     }
 
-    // Gerar links para todos os grupos (ordem: corrida → academia → complementos)
     const todasOrdenadas = PILARES.flatMap(({ id }) => grupos[id]);
     console.log('\n🔗 Gerando links...');
     const prontas  = await aplicarAfiliados(todasOrdenadas);
@@ -83,25 +91,21 @@ async function executar() {
       return;
     }
 
-    // Reagrupar prontas por pilar (mantém ordem de prioridade)
     const prontasPorPilar = {};
     for (const { id } of PILARES) {
       prontasPorPilar[id] = prontas.filter(o => o.pilar === id);
     }
 
-    // ── Montar arquivo de posts por pilar ────────────────────────────────────
     const SEP   = '\n\n' + '─'.repeat(40) + '\n\n';
     const SEP_P = '\n\n' + '═'.repeat(50) + '\n\n';
 
     const secoes = [];
-    const todosPostsConsole = [];
 
     for (const { id, label } of PILARES) {
       const grupo = prontasPorPilar[id];
       if (!grupo.length) continue;
       const posts = formatarParaWhatsApp(grupo);
       secoes.push(`${'═'.repeat(50)}\n${label}\n${'═'.repeat(50)}\n\n` + posts.join(SEP));
-      todosPostsConsole.push(...posts.map((p, i) => ({ pilar: label, num: i + 1, total: posts.length, post: p })));
     }
 
     const conteudoArquivo = secoes.join(SEP_P);
@@ -112,7 +116,6 @@ async function executar() {
       'utf-8'
     );
 
-    // ── Exibir no console ────────────────────────────────────────────────────
     for (const { id, label } of PILARES) {
       const grupo = prontasPorPilar[id];
       if (!grupo.length) continue;
@@ -126,8 +129,18 @@ async function executar() {
       console.log('');
     }
 
-    const total = marcarComoPostadas(prontas);
-    console.log(`📁 Salvo em posts_whatsapp.txt (por pilar) | historico.json: ${total} registradas\n`);
+    // Registra como Pendente na planilha antes de perguntar
+    await adicionarPendentes(prontas);
+
+    const resp = await confirmar('❓ Marcar todos como Enviado? (s/n): ');
+    if (resp === 's') {
+      await marcarComoEnviadas(prontas);
+      console.log(`\n✅ ${prontas.length} oferta(s) marcadas como Enviado em historico.xlsx`);
+    } else {
+      console.log('\nℹ  Mantidas como Pendente — aparecerão na próxima execução.');
+    }
+
+    console.log(`📁 posts_whatsapp.txt salvo por pilar\n`);
 
   } catch (err) {
     console.error('\n❌ Erro:', err.message);
@@ -135,13 +148,22 @@ async function executar() {
   }
 }
 
-// ── CLI direto ───────────────────────────────────────────────────────────────
+// ── CLI ──────────────────────────────────────────────────────────────────────
 
 if (require.main === module) {
-  const args = process.argv.slice(2);
-  if (args.includes('--resetar-historico')) { resetar(); console.log('✅ Histórico resetado.'); process.exit(0); }
-  if (args.includes('--historico'))         { console.log('📋', estatisticas()); process.exit(0); }
-  executar();
+  (async () => {
+    const args = process.argv.slice(2);
+    if (args.includes('--resetar-historico')) {
+      await resetar();
+      console.log('✅ Histórico resetado (historico.xlsx recriado).');
+      process.exit(0);
+    }
+    if (args.includes('--historico')) {
+      console.log(await mostrarResumo());
+      process.exit(0);
+    }
+    await executar();
+  })();
 }
 
 module.exports = { executar };
