@@ -1,18 +1,22 @@
 require('dotenv').config();
 
 const readline = require('readline');
+const fs       = require('fs');
+const path     = require('path');
 
-const { buscarOfertas }                                    = require('./scraper');
+const { buscarOfertas }                                   = require('./scraper');
 const { filtrarEsportes, filtrarPorPlataforma,
         filtrarDesconto, detectarPilar,
-        ordenarPorPrioridade }                             = require('./filtro');
-const { formatarParaWhatsApp }                             = require('./formatador');
-const { gerarLinkAfiliado, statusAfiliados }               = require('./afiliados');
+        ordenarPorPrioridade }                            = require('./filtro');
+const { formatarParaWhatsApp }                            = require('./formatador');
+const { gerarLinkAfiliado, statusAfiliados }              = require('./afiliados');
 const { filtrarNovos, adicionarPendentes,
         marcarComoEnviadas, resetar,
-        estatisticas, mostrarResumo }                      = require('./historico');
-const fs   = require('fs');
-const path = require('path');
+        estatisticas, mostrarResumo }                     = require('./historico');
+const { calcularScore, extrairTags, imprimirDebugScore }  = require('./score');
+const config                                              = require('./config');
+
+const MODO_DEBUG = process.argv.includes('--debug');
 
 const PILARES = [
   { id: 'corrida',      label: '🏃 PILAR 1 — CORRIDA'           },
@@ -20,19 +24,45 @@ const PILARES = [
   { id: 'complementos', label: '🏋️ PILAR 3 — COMPLEMENTOS'       },
 ];
 
+// ── Enriquecimento (score + tags) ────────────────────────────────────────────
+// Executado após filtrarNovos para não computar score de ofertas já enviadas.
+
+function enriquecerOfertas(ofertas) {
+  return ofertas.map(o => {
+    const scoreData = calcularScore(o);
+    const tags      = extrairTags(o);
+    return { ...o, ...scoreData, tags };
+  });
+}
+
+// ── Geração de links afiliados — lotes concorrentes (Implementação 11) ───────
+// Promise.allSettled garante que uma falha num lote não cancela os demais.
+// LOTE_AFILIADOS controla concorrência sem sobrecarregar as APIs.
+
 async function aplicarAfiliados(ofertas) {
-  const prontas = [];
-  for (let i = 0; i < ofertas.length; i++) {
-    const oferta = ofertas[i];
-    const link   = await gerarLinkAfiliado(oferta.sourceUrl || oferta.link, oferta.loja);
-    if (link) {
-      oferta.linkAfiliado = link;
-      prontas.push(oferta);
+  const prontas   = [];
+  const LOTE      = config.LOTE_AFILIADOS;
+
+  for (let i = 0; i < ofertas.length; i += LOTE) {
+    const lote      = ofertas.slice(i, i + LOTE);
+    const resultados = await Promise.allSettled(
+      lote.map(async (oferta) => {
+        const link = await gerarLinkAfiliado(oferta.sourceUrl || oferta.link, oferta.loja);
+        return link ? { ...oferta, linkAfiliado: link } : null;
+      })
+    );
+
+    for (const res of resultados) {
+      if (res.status === 'fulfilled' && res.value) prontas.push(res.value);
     }
-    if ((i + 1) % 5 === 0) await new Promise(r => setTimeout(r, 300));
+
+    if (i + LOTE < ofertas.length) await new Promise(r => setTimeout(r, 300));
   }
+
   return prontas;
 }
+
+// ── Confirmação interativa ───────────────────────────────────────────────────
 
 function confirmar(pergunta) {
   return new Promise(resolve => {
@@ -42,6 +72,8 @@ function confirmar(pergunta) {
   });
 }
 
+// ── Execução principal ───────────────────────────────────────────────────────
+
 async function executar() {
   console.log('');
   console.log('🏃 BOT DE OFERTAS ESPORTIVAS — WhatsApp');
@@ -49,32 +81,60 @@ async function executar() {
   console.log('🔗 Plataformas:');
   console.log(statusAfiliados());
   console.log(`\n📋 Histórico: ${await estatisticas()}`);
+  console.log(
+    `\n⚙  Config: min_desc=${config.MIN_DESCONTO}% | ` +
+    `min_temp=${config.MIN_TEMPERATURA} | ` +
+    `max_ofertas=${config.MAX_OFERTAS_DIA} | ` +
+    `validade=${config.DIAS_VALIDADE_HISTORICO}d`
+  );
   console.log('\n🔍 Buscando no Pelando.com.br...\n');
 
   try {
     const todas       = await buscarOfertas();
     const esportivas  = filtrarEsportes(todas);
     const comPlat     = filtrarPorPlataforma(esportivas);
-    const comDesconto = filtrarDesconto(comPlat, 10);
+    const comDesconto = filtrarDesconto(comPlat, config.MIN_DESCONTO);
 
-    const comPilar = comDesconto.map(o => ({ ...o, ...detectarPilar(o) }));
+    // Implementação 3 — filtro por temperatura mínima configurável
+    const comTemp = config.MIN_TEMPERATURA > 0
+      ? comDesconto.filter(o => (o.temperatura || 0) >= config.MIN_TEMPERATURA)
+      : comDesconto;
+
+    const comPilar = comTemp.map(o => ({ ...o, ...detectarPilar(o) }));
     const novas    = await filtrarNovos(comPilar);
 
+    // Enriquece com score e tags antes de ordenar
+    const enriquecidas = enriquecerOfertas(novas);
+
+    // Ordena globalmente por score e seleciona o top N do dia (Implementação 5)
+    const ordenadas  = ordenarPorPrioridade(enriquecidas);
+    const topOfertas = ordenadas.slice(0, config.MAX_OFERTAS_DIA);
+
+    // Agrupa por pilar após seleção global
     const grupos = {};
     for (const { id } of PILARES) {
-      grupos[id] = ordenarPorPrioridade(novas.filter(o => o.pilar === id));
+      grupos[id] = topOfertas.filter(o => o.pilar === id);
     }
 
     const totalNovas = novas.length;
     console.log(
       `✅ ${todas.length} encontradas → ${esportivas.length} esportivas → ` +
-      `${comPlat.length} com afiliado → ${comDesconto.length} c/ ≥10% desc → ${totalNovas} novas`
+      `${comPlat.length} c/ afiliado → ${comDesconto.length} c/ ≥${config.MIN_DESCONTO}% desc → ` +
+      `${comTemp.length} c/ temp≥${config.MIN_TEMPERATURA} → ${totalNovas} novas → ` +
+      `${topOfertas.length} selecionadas (top ${config.MAX_OFERTAS_DIA})`
     );
     PILARES.forEach(({ id, label }) => {
       if (grupos[id].length) console.log(`   ${label}: ${grupos[id].length}`);
     });
 
-    if (totalNovas === 0) {
+    // Implementação 13 — debug de score visível
+    if (MODO_DEBUG && topOfertas.length > 0) {
+      console.log('\n🔬 DEBUG — Score das ofertas selecionadas:');
+      topOfertas.forEach(imprimirDebugScore);
+      console.log('');
+    }
+
+    if (topOfertas.length === 0) {
       console.log('\nℹ  Nenhuma oferta nova.');
       console.log('   → Use --resetar-historico para repostar tudo.');
       return;
@@ -100,7 +160,6 @@ async function executar() {
     const SEP_P = '\n\n' + '═'.repeat(50) + '\n\n';
 
     const secoes = [];
-
     for (const { id, label } of PILARES) {
       const grupo = prontasPorPilar[id];
       if (!grupo.length) continue;
@@ -112,7 +171,10 @@ async function executar() {
     fs.writeFileSync(path.join(__dirname, 'posts_whatsapp.txt'), conteudoArquivo, 'utf-8');
     fs.writeFileSync(
       path.join(__dirname, 'ofertas.json'),
-      JSON.stringify({ geradoEm: new Date().toLocaleString('pt-BR'), total: prontas.length, ofertas: prontas }, null, 2),
+      JSON.stringify(
+        { geradoEm: new Date().toLocaleString('pt-BR'), total: prontas.length, ofertas: prontas },
+        null, 2
+      ),
       'utf-8'
     );
 
@@ -129,7 +191,6 @@ async function executar() {
       console.log('');
     }
 
-    // Registra como Pendente na planilha antes de perguntar
     await adicionarPendentes(prontas);
 
     const resp = await confirmar('❓ Marcar todos como Enviado? (s/n): ');
@@ -144,11 +205,78 @@ async function executar() {
 
   } catch (err) {
     console.error('\n❌ Erro:', err.message);
-    if (process.argv.includes('--debug')) console.error(err.stack);
+    if (MODO_DEBUG) console.error(err.stack);
   }
 }
 
-// ── CLI ──────────────────────────────────────────────────────────────────────
+// ── Modo ranking (--ranking) ─────────────────────────────────────────────────
+// Exibe tabela de scores sem gerar links, sem modificar histórico.
+// Útil para monitorar qualidade e calibrar pesos antes de rodar o bot completo.
+
+async function exibirRanking() {
+  const MAX_RANKING = Number(process.argv.find(a => a.startsWith('--top='))?.split('=')[1]) || 30;
+
+  console.log('');
+  console.log('📊 BOT DE OFERTAS — MODO RANKING');
+  console.log('═'.repeat(60));
+  console.log(`⚙  pesos: desc=${config.PESOS_SCORE.desconto} | temp=${config.PESOS_SCORE.temperatura} | cat=${config.PESOS_SCORE.categoria}`);
+  console.log(`   min_desc=${config.MIN_DESCONTO}% | min_temp=${config.MIN_TEMPERATURA} | exibindo top ${MAX_RANKING}`);
+  console.log('\n🔍 Buscando no Pelando.com.br...\n');
+
+  try {
+    const todas       = await buscarOfertas();
+    const esportivas  = filtrarEsportes(todas);
+    const comPlat     = filtrarPorPlataforma(esportivas);
+    const comDesconto = filtrarDesconto(comPlat, config.MIN_DESCONTO);
+    const comTemp     = config.MIN_TEMPERATURA > 0
+      ? comDesconto.filter(o => (o.temperatura || 0) >= config.MIN_TEMPERATURA)
+      : comDesconto;
+
+    const comPilar     = comTemp.map(o => ({ ...o, ...detectarPilar(o) }));
+    const enriquecidas = enriquecerOfertas(comPilar);
+    const ordenadas    = ordenarPorPrioridade(enriquecidas).slice(0, MAX_RANKING);
+
+    console.log(`✅ ${todas.length} buscadas → ${esportivas.length} esportivas → ${comTemp.length} filtradas → exibindo top ${ordenadas.length}\n`);
+
+    // Cabeçalho da tabela
+    const SEP = '─'.repeat(100);
+    console.log(SEP);
+    console.log(
+      ' Pos  Score  Desc  Temp   Preço      Pilar         Produto'
+    );
+    console.log(SEP);
+
+    ordenadas.forEach((o, i) => {
+      const pos    = String(i + 1).padStart(3);
+      const score  = String(o.score).padStart(5);
+      const desc   = o.descontoNum ? `${String(o.descontoNum).padStart(3)}%` : '  —%';
+      const temp   = String(o.temperatura || 0).padStart(4) + '°';
+      const preco  = o.precoNumerico
+        ? `R$${o.precoNumerico.toFixed(0).padStart(6)}`
+        : '       —';
+      const pilar  = (o.pilar || '—').padEnd(12);
+      const maxTit = 50;
+      const titulo = o.titulo.length > maxTit ? o.titulo.slice(0, maxTit) + '…' : o.titulo;
+
+      const fimLinha = i < config.MAX_OFERTAS_DIA ? '' : '  ← abaixo do corte';
+      console.log(` ${pos}  ${score}  ${desc}  ${temp}  ${preco}  ${pilar}  ${titulo}${fimLinha}`);
+    });
+
+    console.log(SEP);
+    console.log(`\n✂  Linha de corte: top ${config.MAX_OFERTAS_DIA} (MAX_OFERTAS_DIA)`);
+
+    // Breakdown dos componentes para os top 5
+    console.log('\n🔬 Detalhe de score — top 5:\n');
+    ordenadas.slice(0, 5).forEach(o => imprimirDebugScore(o));
+    console.log('');
+
+  } catch (err) {
+    console.error('\n❌ Erro:', err.message);
+    if (MODO_DEBUG) console.error(err.stack);
+  }
+}
+
+// ── CLI ───────────────────────────────────────────────────────────────────────
 
 if (require.main === module) {
   (async () => {
@@ -162,8 +290,12 @@ if (require.main === module) {
       console.log(await mostrarResumo());
       process.exit(0);
     }
+    if (args.includes('--ranking')) {
+      await exibirRanking();
+      process.exit(0);
+    }
     await executar();
   })();
 }
 
-module.exports = { executar };
+module.exports = { executar, exibirRanking };

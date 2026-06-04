@@ -1,36 +1,126 @@
 const { detectarPlataforma, PLATAFORMAS } = require('./afiliados');
 
-const PALAVRAS_ESPORTE = [
-  // Calçados
-  'tênis', 'tenis', 'chuteira', 'sapatilha', 'botinha',
-  // Marcas
-  'nike', 'adidas', 'puma', 'asics', 'new balance', 'under armour',
-  'reebok', 'mizuno', 'fila', 'olympikus', 'penalty', 'topper',
+// ── Padrões de inclusão (Implementação 9) ────────────────────────────────────
+// Convertidos de includes() para regex com word-boundaries onde necessário.
+// Ordem: mais específico → mais genérico.
+
+const PADROES_INCLUIR = [
+  // Calçados — "tênis de mesa" é explicitamente excluído abaixo
+  /\bt[eê]nis\b/i,
+  /\bchuteira\b/i,
+  /\bsapatilha\b/i,
+  /\bbotinha\b/i,
+  // Marcas esportivas reconhecidas
+  /\bnike\b/i,
+  /\badidas\b/i,
+  /\bpuma\b/i,
+  /\basics\b/i,
+  /new balance/i,
+  /under armour/i,
+  /\breebok\b/i,
+  /\bmizuno\b/i,
+  /\bfila\b/i,
+  /\bolympikus\b/i,
+  /\bpenalty\b/i,
+  /\btopper\b/i,
+  /\bgarmin\b/i,
+  /\bpolar\b/i,
+  /\bsuunto\b/i,
   // Corrida
-  'corrida', 'running', 'trail', 'maratona', 'cinto hidratação',
-  'viseira corrida', 'faixa cabeça', 'relógio corrida', 'gps corrida',
+  /\bcorrida\b/i,
+  /\brunning\b/i,
+  /\btrail\b/i,
+  /\bmaratona\b/i,
+  /cinto hidrata/i,
+  /viseira corrida/i,
+  /faixa cabe[çc]/i,
+  /rel[oó]gio corrida/i,
+  /gps corrida/i,
   // Roupas e acessórios fitness
-  'legging', 'bermuda esportiva', 'bermuda fitness', 'camisa esportiva',
-  'camiseta esportiva', 'camiseta dry fit', 'dry fit', 'top fitness',
-  'top esportivo', 'agasalho', 'moletom esportivo', 'regata esportiva',
-  'short academia', 'shorts esportivo', 'meias esportivas', 'meia esportiva',
+  /\blegging\b/i,
+  /bermuda esportiva/i,
+  /bermuda fitness/i,
+  /camisa esportiva/i,
+  /camiseta esportiva/i,
+  /camiseta dry.?fit/i,
+  /\bdry.?fit\b/i,
+  /top fitness/i,
+  /top esportivo/i,
+  /\bagasalho\b/i,
+  /moletom esportivo/i,
+  /regata esportiva/i,
+  /short academia/i,
+  /shorts esportivo/i,
+  /meias esportivas/i,
+  /meia esportiva/i,
   // Equipamentos
-  'haltere', 'kettlebell', 'anilha', 'elástico musculação', 'faixa resistência',
-  'mochila esportiva', 'joelheira', 'caneleira', 'luva esportiva',
-  'tapete yoga', 'tapete pilates',
+  /\bhaltere\b/i,
+  /\bkettlebell\b/i,
+  /\banilha\b/i,
+  /el[aá]stico muscula/i,
+  /faixa resist[eê]ncia/i,
+  /mochila esportiva/i,
+  /\bjoelheira\b/i,
+  /\bcaneleira\b/i,
+  /luva esportiva/i,
+  /tapete yoga/i,
+  /tapete pilates/i,
   // Tecnologia esportiva
-  'smartband', 'smartwatch', 'fitness tracker',
-  // Suplementos e nutrição
-  'whey', 'creatina', 'bcaa', 'aminoácido', 'pré-treino', 'pré treino',
-  'pre treino', 'pre workout', 'suplemento', 'shaker', 'coqueteleira',
+  /\bsmartband\b/i,
+  /\bsmartwatch\b/i,
+  /fitness tracker/i,
+  // Suplementos
+  /\bwhey\b/i,
+  /\bcreatina\b/i,
+  /\bbcaa\b/i,
+  /amino[aá]cido/i,
+  /pr[eé].?treino/i,
+  /pre.?workout/i,
+  /\bsuplemento\b/i,
+  /\bshaker\b/i,
+  /\bcoqueteleira\b/i,
   // Modalidades
-  'futebol', 'basquete', 'vôlei', 'volleyball', 'natação', 'ciclismo',
-  'academia', 'musculação', 'crossfit', 'yoga', 'pilates', 'fitness',
-  // Genéricos
-  'esportivo', 'esportiva', 'esportes', 'treino',
+  /\bfutebol\b/i,
+  /\bbasquete\b/i,
+  /\bv[oô]lei\b/i,
+  /volleyball/i,
+  /nata[çc][aã]o/i,
+  /\bciclismo\b/i,
+  /\bacademia\b/i,
+  /muscula[çc][aã]o/i,
+  /\bcrossfit\b/i,
+  /\byoga\b/i,
+  /\bpilates\b/i,
+  /\bfitness\b/i,
+  // Genéricos esportivos — só como última âncora
+  /\besportivo\b/i,
+  /\besportiva\b/i,
+  /\besportes\b/i,
+  /\btreino\b/i,
 ];
 
-// ── Detecção de pilar, emoji e subcategoria de prioridade ───────────────────
+// Padrões de exclusão — verificados ANTES da inclusão.
+// Produtos que passam por "brand match" mas são irrelevantes para treino/corrida/fitness.
+const PADROES_EXCLUIR = [
+  /t[eê]nis\s+de\s+mesa/i,
+  /\bminiatura\b/i,
+  /\bboneco\b/i,
+  /\bboneca\b/i,
+  /\bbrinquedo/i,
+  /\binfantil\b/i,
+  /\bcaneca\b/i,
+  /\bchaveiro\b/i,
+  /\bpijama\b/i,
+  /papel de parede/i,
+  /\bposter\b/i,
+  /quadro decorat/i,
+  /decora[çc][aã]o\s+(esportiva|nike|adidas)/i,
+  /\bpelúcia\b/i,
+  /\bfigurinha\b/i,
+  /\bcaminha\b/i,  // caminha de pet com marca esportiva no nome
+];
+
+// ── Detecção de pilar, emoji e subcategoria ──────────────────────────────────
 // subcategoria: 1=suplementos · 2=smartbands · 3=moda fitness · 4=acessórios
 
 function detectarPilar(oferta) {
@@ -45,7 +135,7 @@ function detectarPilar(oferta) {
   if (/pré.?treino|pre.?workout|bcaa|amino[aá]cido/.test(t))
     return { pilar: 'complementos', emoji: '🏋️', subcategoria: 1 };
 
-  if (/corrida|running|trail|maratona|cinto hidrata|viseira|faixa cabe[cç]a/.test(t))
+  if (/corrida|running|trail|maratona|cinto hidrata|viseira|faixa cabe[çc]a/.test(t))
     return { pilar: 'corrida', emoji: '🏃', subcategoria: 4 };
 
   if (/legging|top fitness|top esportivo|short academia|bermuda fitness|dry.?fit/.test(t))
@@ -65,7 +155,12 @@ function detectarPilar(oferta) {
 function filtrarEsportes(ofertas) {
   return ofertas.filter(o => {
     const texto = `${o.titulo} ${o.loja || ''}`.toLowerCase();
-    return PALAVRAS_ESPORTE.some(p => texto.includes(p));
+
+    // Exclui falsos positivos primeiro
+    if (PADROES_EXCLUIR.some(rx => rx.test(texto))) return false;
+
+    // Então testa padrões de inclusão
+    return PADROES_INCLUIR.some(rx => rx.test(texto));
   });
 }
 
@@ -91,16 +186,21 @@ function filtrarDesconto(ofertas, minPct = 10) {
   return ofertas.filter(o => !o.descontoNum || o.descontoNum >= minPct);
 }
 
-// ── Ordenação por prioridade ─────────────────────────────────────────────────
-// 1º critério: maior desconto percentual
-// 2º critério: subcategoria (1=suplementos > 2=smartbands > 3=moda > 4=acessórios)
+// ── Ordenação por score (Implementação 4) ────────────────────────────────────
+// Nova lógica: 1º score (inteligente) → 2º temperatura → 3º desconto
+// Substituiu: 1º desconto → 2º subcategoria
 
 function ordenarPorPrioridade(ofertas) {
   return [...ofertas].sort((a, b) => {
-    const dA = a.descontoNum || 0;
-    const dB = b.descontoNum || 0;
-    if (dB !== dA) return dB - dA;
-    return (a.subcategoria || 4) - (b.subcategoria || 4);
+    const sA = a.score       || 0;
+    const sB = b.score       || 0;
+    if (sB !== sA) return sB - sA;
+
+    const tA = a.temperatura || 0;
+    const tB = b.temperatura || 0;
+    if (tB !== tA) return tB - tA;
+
+    return (b.descontoNum || 0) - (a.descontoNum || 0);
   });
 }
 

@@ -1,3 +1,5 @@
+// ── Slogans por categoria (headline em caixa alta) ───────────────────────────
+
 const SLOGANS = {
   nike: [
     'JUST DO IT — E AINDA ECONOMIZE MUITO',
@@ -74,6 +76,18 @@ const SLOGANS = {
     'RESULTADOS REAIS COM ECONOMIA REAL NO BOLSO',
     'SUPLEMENTAÇÃO DE ELITE ACESSÍVEL PARA TODOS',
   ],
+  creatina: [
+    'O SUPLEMENTO MAIS ESTUDADO DA CIÊNCIA DO ESPORTE',
+    'CREATINA PURA: FORÇA, POTÊNCIA E PREÇO JUSTO',
+    'GANHE MAIS FORÇA — PAGUE MENOS PARA ISSO',
+    'CADA GRAMA VALE MUITO NO SEU RESULTADO',
+  ],
+  whey: [
+    'PROTEÍNA DE QUALIDADE NO PREÇO QUE VOCÊ PEDIU',
+    'RECUPERAÇÃO ACELERADA COM O MELHOR CUSTO-BENEFÍCIO',
+    'SEU MÚSCULO PEDE ISSO APÓS CADA TREINO',
+    'ALTO TEOR DE PROTEÍNA, BAIXO CUSTO POR DOSE',
+  ],
   pretreino: [
     'ENERGIA MÁXIMA POR MUITO MENOS DO QUE VOCÊ PENSA',
     'FOCO, FORÇA E DESCONTO — TRIFECTA DO ATLETA ESPERTO',
@@ -119,23 +133,109 @@ const SLOGANS = {
   ],
 };
 
+// ── Copys contextuais (Implementação 12) ─────────────────────────────────────
+// Textos mais humanos e conversacionais, selecionados aleatoriamente a cada run.
+// Objetivo: evitar repetição de mensagens entre execuções.
+
+const COPYS_CONTEXTUAIS = {
+  corrida: [
+    'Ideal para aumentar o conforto nos seus treinos.',
+    'Ótima oportunidade para renovar o tênis de corrida.',
+    'Perfeito para quem está aumentando o volume de treino.',
+    'Uma boa opção para evoluir o pace.',
+    'Recomendado para treinos de longa distância.',
+    'Quem corre sabe o quanto o calçado faz diferença.',
+  ],
+  tenis: [
+    'Custo-benefício muito bom para o nível de tecnologia.',
+    'Boa oportunidade para renovar o tênis sem gastar muito.',
+    'Conforto comprovado por atletas de vários níveis.',
+    'Ideal para quem quer qualidade sem abrir mão do preço.',
+  ],
+  smartband: [
+    'Tecnologia de ponta para monitorar seu desempenho.',
+    'Ideal para quem treina sério e quer dados precisos.',
+    'Excelente para controlar frequência cardíaca e pace.',
+    'Um aliado poderoso para evoluir com consistência.',
+  ],
+  creatina: [
+    'Um dos suplementos mais estudados da ciência do esporte.',
+    'Excelente relação preço por grama de creatina.',
+    'Ótima opção para quem quer ganhar força e potência.',
+    'Suplemento base para quem treina com seriedade.',
+  ],
+  whey: [
+    'Alta concentração de proteína por dose.',
+    'Ótimo custo-benefício para recuperação pós-treino.',
+    'Excelente relação preço por grama de proteína.',
+    'Um dos suplementos mais procurados do momento.',
+  ],
+  suplemento: [
+    'Excelente custo-benefício para recuperação muscular.',
+    'Ótima relação preço por dose.',
+    'Muito bem avaliado por atletas e praticantes.',
+    'Qualidade premium com preço acessível.',
+    'Um dos suplementos mais buscados nessa faixa de preço.',
+  ],
+  pretreino: [
+    'Ótima escolha para quem busca mais energia e foco nos treinos.',
+    'Fórmula completa para rendimento máximo.',
+    'Excelente custo por dose comparado com similares.',
+    'Indicado para treinos de alta intensidade.',
+  ],
+  bcaa: [
+    'Proteção muscular em treinos de alto volume.',
+    'Auxilia na recuperação e reduz a fadiga muscular.',
+    'Preço por dose muito competitivo.',
+    'Suplementação essencial para treinos intensos.',
+  ],
+  academia: [
+    'Ideal para quem quer evoluir nos treinos de força.',
+    'Ótima opção para completar seu kit de treino.',
+    'Excelente qualidade para o dia a dia de academia.',
+    'Custo-benefício muito acima da média.',
+  ],
+  roupa: [
+    'Conforto e performance em cada movimento.',
+    'Tecido de alta qualidade para treinos intensos.',
+    'Design esportivo com funcionalidade real.',
+    'Da academia à rua, sem comprometer o estilo.',
+  ],
+  yoga: [
+    'Qualidade que você sente na primeira sessão.',
+    'Estabilidade e conforto para praticar com segurança.',
+    'Ótima espessura e grip para qualquer nível.',
+  ],
+  esporte: [
+    'Excelente custo-benefício para esta categoria.',
+    'Muito bem avaliado por praticantes de esporte.',
+    'Ótimo momento para aproveitar esse desconto.',
+    'Qualidade comprovada com preço especial.',
+    'Uma das melhores opções disponíveis agora.',
+  ],
+};
+
+// ── Mapeamento de categoria ───────────────────────────────────────────────────
+
 const REGRAS_CATEGORIA = [
-  [/nike/i,                                         'nike'],
-  [/adidas/i,                                       'adidas'],
-  [/puma/i,                                         'puma'],
-  [/asics/i,                                        'asics'],
-  [/fila\b/i,                                       'fila'],
-  [/smartband|smartwatch|fitness.?tracker/i,        'smartband'],
-  [/pré.?treino|pre.?workout/i,                     'pretreino'],
-  [/bcaa|amino[aá]cido/i,                           'bcaa'],
-  [/whey|creatina|suplemento/i,                     'suplemento'],
-  [/chuteira/i,                                     'chuteira'],
-  [/corrida|running|maratona|trail/i,               'corrida'],
-  [/musculação|musculacao|haltere|kettlebell|anilha/i, 'musculacao'],
-  [/academia|crossfit|funcional/i,                  'academia'],
-  [/yoga|pilates|meditação|tapete/i,                'yoga'],
+  [/nike/i,                                              'nike'],
+  [/adidas/i,                                            'adidas'],
+  [/puma/i,                                              'puma'],
+  [/asics/i,                                             'asics'],
+  [/fila\b/i,                                            'fila'],
+  [/smartband|smartwatch|fitness.?tracker/i,             'smartband'],
+  [/pré.?treino|pre.?workout/i,                          'pretreino'],
+  [/bcaa|amino[aá]cido/i,                                'bcaa'],
+  [/\bcreatina\b/i,                                      'creatina'],
+  [/\bwhey\b/i,                                          'whey'],
+  [/suplemento/i,                                        'suplemento'],
+  [/\bchuteira\b/i,                                      'chuteira'],
+  [/corrida|running|maratona|trail/i,                    'corrida'],
+  [/muscula[çc][aã]o|musculacao|haltere|kettlebell|anilha/i, 'musculacao'],
+  [/academia|crossfit|funcional/i,                       'academia'],
+  [/yoga|pilates|medita[çc][aã]o|tapete/i,               'yoga'],
   [/legging|bermuda|short|camiseta|camisa esport|regata|top (fitness|esportivo)|dry.?fit/i, 'roupa'],
-  [/tênis|tenis/i,                                  'tenis'],
+  [/t[eê]nis/i,                                          'tenis'],
 ];
 
 function detectarCategoria(titulo) {
@@ -145,18 +245,20 @@ function detectarCategoria(titulo) {
   return 'esporte';
 }
 
-function hashTitulo(str) {
-  let h = 5381;
-  for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) + h + str.charCodeAt(i)) & 0xffffffff;
-  }
-  return Math.abs(h);
+// Seleção aleatória (não determinística) para evitar mensagens repetitivas.
+function escolherAleatorio(lista) {
+  return lista[Math.floor(Math.random() * lista.length)];
 }
 
 function gerarSlogan(titulo) {
   const categoria = detectarCategoria(titulo);
-  const lista = SLOGANS[categoria] || SLOGANS.esporte;
-  return lista[hashTitulo(titulo) % lista.length];
+  return escolherAleatorio(SLOGANS[categoria] || SLOGANS.esporte);
+}
+
+function gerarCopyContextual(titulo) {
+  const categoria = detectarCategoria(titulo);
+  const lista = COPYS_CONTEXTUAIS[categoria] || COPYS_CONTEXTUAIS.esporte;
+  return escolherAleatorio(lista);
 }
 
 // ── Formatação ───────────────────────────────────────────────────────────────
@@ -168,10 +270,13 @@ function limpar(preco) {
 function formatarOferta(oferta) {
   const emoji  = oferta.emoji || '🏃';
   const slogan = gerarSlogan(oferta.titulo);
+  const copy   = gerarCopyContextual(oferta.titulo);
   const linhas = [];
 
   linhas.push(`${emoji} *${oferta.titulo}*`);
   linhas.push(`${slogan} ✨`);
+  linhas.push('');
+  linhas.push(`💬 ${copy}`);
   linhas.push('');
 
   if (oferta.precoOriginal) {

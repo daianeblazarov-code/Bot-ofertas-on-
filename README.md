@@ -1,238 +1,189 @@
-# 🏃 Bot de Ofertas Esportivas para WhatsApp
+# Bot de Ofertas Esportivas — WhatsApp
 
-Bot automatizado que busca ofertas de produtos esportivos e gera posts prontos para grupos de WhatsApp, com links de afiliado do Mercado Livre e Amazon.
+Bot automatizado que busca ofertas de produtos esportivos no Pelando.com.br e gera posts prontos para grupos de WhatsApp, com links de afiliado do Mercado Livre e Shopee.
 
 ---
 
-## 📋 Índice
+## Índice
 
 - [Requisitos](#requisitos)
 - [Instalação](#instalação)
 - [Configuração](#configuração)
 - [Como usar](#como-usar)
 - [Comandos disponíveis](#comandos-disponíveis)
-- [Estrutura dos posts](#estrutura-dos-posts)
 - [Histórico de ofertas](#histórico-de-ofertas)
 - [Pilares de busca](#pilares-de-busca)
-- [Dúvidas frequentes](#dúvidas-frequentes)
+- [Plataformas suportadas](#plataformas-suportadas)
 
 ---
 
-## 💻 Requisitos
+## Requisitos
 
-Antes de começar, você precisa ter instalado no computador:
-
-- **Node.js** versão 18 ou superior
-  - Baixe em: [nodejs.org](https://nodejs.org) → escolha a versão LTS
-- **Windows** 10 ou superior (também funciona em Mac e Linux)
-- Conta no **Mercado Livre Afiliados**
-- Conta na **Amazon Associados** (opcional)
+- **Node.js** versão 18 ou superior — baixe em [nodejs.org](https://nodejs.org) (versão LTS)
+- Conta no **Mercado Livre Afiliados** e/ou **Shopee Afiliados**
 
 ---
 
-## 🚀 Instalação
-
-### Passo 1 — Baixar o projeto
-
-Copie a pasta `bot-ofertas` para o seu computador.
-
-### Passo 2 — Instalar as dependências
-
-Abra o **Prompt de Comando** dentro da pasta do projeto e digite:
+## Instalação
 
 ```bash
+git clone <repo>
+cd Bot-ofertas-on-
 npm install
 ```
 
-Aguarde a instalação terminar.
-
 ---
 
-## ⚙️ Configuração
+## Configuração
 
-### Passo 1 — Configurar o arquivo .env
-
-Abra o arquivo `.env` na pasta do projeto com o **Bloco de Notas** e preencha com suas credenciais:
+Crie (ou edite) o arquivo `.env` na raiz do projeto:
 
 ```env
-# Mercado Livre
-MERCADOLIVRE_TAG=seu_id_de_afiliado
-MERCADOLIVRE_APP_ID=seu_app_id
-MERCADOLIVRE_SECRET=seu_client_secret
-MERCADOLIVRE_TOKEN=será_preenchido_automaticamente
+# Mercado Livre — obrigatório para processar ofertas do ML
+MERCADOLIVRE_TAG=seu_tag_aqui
 
-# Amazon
-AMAZON_ASSOCIATE_ID=seu_id-20
-
-# Shopee (opcional)
+# Shopee — obrigatório para processar ofertas da Shopee
 SHOPEE_AFFILIATE_TOKEN=seu_token_aqui
+SHOPEE_AFFILIATE_ID=seu_id_aqui
 
-# Lomadee (opcional)
-LOMADEE_SOURCE_ID=seu_source_id
+# Agendador — horários de execução no padrão cron (padrão: 8h, 12h e 18h)
+BOT_HORARIOS=0 8,12,18 * * *
 ```
 
 ### Onde encontrar cada credencial?
 
-#### Mercado Livre
+**Mercado Livre**
 1. Acesse [afiliados.mercadolivre.com.br](https://afiliados.mercadolivre.com.br)
-2. Sua **tag** aparece no perfil de afiliado
-3. Para o App ID e Secret: acesse [developers.mercadolivre.com.br](https://developers.mercadolivre.com.br) → Criar aplicativo
+2. Sua **tag** (ex: `seunome-20`) aparece no seu perfil de afiliado
+3. Cole o valor em `MERCADOLIVRE_TAG`
 
-#### Amazon
-1. Acesse [associados.amazon.com.br](https://associados.amazon.com.br)
-2. Seu **ID de associado** aparece no topo da tela (formato: `seunome-20`)
+**Shopee**
+1. Acesse o painel de afiliados da Shopee
+2. Vá em **API Keys** e copie o token e o ID
+3. Cole em `SHOPEE_AFFILIATE_TOKEN` e `SHOPEE_AFFILIATE_ID`
 
-#### Shopee
-1. Abra o app Shopee → Eu → Afiliado Shopee
-2. Vá em **API Keys** para obter o token
-
-### Passo 2 — Autorizar o Mercado Livre (apenas uma vez)
-
-Execute o comando abaixo e siga as instruções na tela:
-
-```bash
-npm run auth
-```
-
-O navegador vai abrir automaticamente. Faça login com sua conta do Mercado Livre e clique em **Autorizar**. Após isso, o token é salvo automaticamente e não precisa repetir esse passo.
+> Amazon e Netshoes não são suportadas (sem API pública de link curto).
 
 ---
 
-## 📲 Como usar
+## Como usar
 
-### Uso diário
-
-Abra o Prompt de Comando na pasta do projeto e digite:
+### Execução manual
 
 ```bash
 npm start
 ```
 
 O bot vai:
-1. Buscar ofertas esportivas automaticamente
-2. Filtrar apenas produtos com desconto
-3. Gerar os posts formatados para WhatsApp
-4. Salvar tudo no arquivo `posts_whatsapp.txt`
+1. Buscar ofertas no Pelando.com.br (feed de mais quentes + 34 termos específicos)
+2. Filtrar por palavras-chave esportivas, plataforma configurada e desconto ≥ 10%
+3. Classificar por pilar e ordenar por maior desconto
+4. Gerar links de afiliado
+5. Exibir os posts formatados no terminal
+6. Salvar `posts_whatsapp.txt` (por pilar) e `ofertas.json`
+7. Perguntar se deseja marcar as ofertas como Enviado na planilha
 
-### Copiar e enviar
+Ao final você verá:
+```
+❓ Marcar todos como Enviado? (s/n):
+```
+- `s` → registra como **Enviado** no `historico.xlsx`
+- `n` → mantém como **Pendente** e reaparece na próxima execução
 
-1. Abra o arquivo `posts_whatsapp.txt` na pasta do projeto
-2. Copie os posts que quiser
-3. Cole no seu grupo do WhatsApp
-4. Pronto!
+### Modo agendado
+
+```bash
+npm run agendar
+```
+
+Executa o bot imediatamente e depois nos horários definidos em `BOT_HORARIOS` (padrão: 8h, 12h e 18h, fuso de Brasília). Para encerrar: `Ctrl+C`.
 
 ---
 
-## 🎮 Comandos disponíveis
+## Comandos disponíveis
 
 | Comando | O que faz |
-|---|---|
-| `npm start` | Busca ofertas novas e gera os posts |
-| `npm run auth` | Autoriza o Mercado Livre (só na primeira vez) |
-| `npm run historico` | Mostra resumo das ofertas enviadas |
-| `npm run resetar` | Limpa o histórico para recomeçar do zero |
+|---------|-----------|
+| `npm start` | Busca ofertas e gera posts (execução única) |
+| `npm run agendar` | Modo agendado — executa nos horários configurados |
+| `npm run historico` | Mostra resumo da planilha (enviadas, pendentes, ignoradas) |
+| `npm run resetar` | Recria `historico.xlsx` vazio para começar do zero |
+| `npm run debug` | Igual ao `start`, mas exibe stack trace completo em erros |
 
 ---
 
-## 📝 Estrutura dos posts
+## Histórico de ofertas
 
-Cada post gerado segue esse formato:
+Cada oferta passa por um ciclo de vida controlado pela planilha `historico.xlsx`:
+
+| Status | Cor | Comportamento |
+|--------|-----|---------------|
+| **Pendente** | Amarelo | Gerado, ainda não postado. Reaparece na próxima execução. |
+| **Enviado** | Verde | Confirmado como postado. Não reaparece por 30 dias. |
+| **Ignorado** | Vermelho | Nunca é exibido novamente. Defina manualmente na planilha. |
+
+### Colunas da planilha
+
+| Coluna | Descrição |
+|--------|-----------|
+| Data/Hora | Quando a oferta foi processada |
+| Pilar | Corrida, Academia & Fitness ou Complementos |
+| Nome do Produto | Título completo |
+| Preço | Preço promocional |
+| % Desconto | Percentual de desconto |
+| Link | Link de afiliado gerado |
+| Status | Pendente / Enviado / Ignorado |
+
+---
+
+## Pilares de busca
+
+As ofertas são classificadas em 3 pilares e ordenadas por **maior desconto** dentro de cada um:
+
+### 🏃 Pilar 1 — Corrida
+Tênis de corrida, trail, meias, cintos de hidratação, viseiras, relógios GPS
+
+### 🏋️ Pilar 2 — Academia & Fitness
+Whey protein, creatina, leggings, tops fitness, shorts, camisetas dry-fit, smartbands
+
+### 🏋️ Pilar 3 — Complementos
+Pré-treino, BCAA, tapetes de yoga/pilates, shakers, coqueteleiras
+
+### Estrutura dos posts gerados
 
 ```
 🏃 *Nome do Produto*
-SLOGAN CRIATIVO DO PRODUTO ✨
+SLOGAN AUTOMÁTICO POR CATEGORIA ✨
 
 💸 De: R$ 199,99
 ⚡ Por: R$ 149,99 (25% OFF)
 
 🔗 👇 Link para Comprar 👇
-https://mercadolivre.com.br/produto?tag=seuID
+https://link-de-afiliado
 ```
 
-### Emojis por categoria:
-- 🏃 Produtos de corrida
-- 🏋️ Academia e fitness
-- 📱 Tecnologia esportiva
+---
+
+## Plataformas suportadas
+
+| Plataforma | Suporte | Configuração necessária |
+|------------|---------|------------------------|
+| Mercado Livre | ✅ Link de rastreamento com tag | `MERCADOLIVRE_TAG` |
+| Shopee | ✅ Link curto via API (`shope.ee`) | `SHOPEE_AFFILIATE_TOKEN` + `SHOPEE_AFFILIATE_ID` |
+| Amazon | ⛔ Sem API pública — sempre ignorada | — |
+| Netshoes | ⛔ Sem link curto oficial — sempre ignorada | — |
 
 ---
 
-## 📊 Histórico de ofertas
+## Estrutura do projeto
 
-O bot controla automaticamente quais ofertas já foram enviadas para não repetir no grupo.
-
-### Como funciona:
-- Cada oferta gerada é salva na planilha `historico.xlsx`
-- Produtos com status **Enviado** nunca aparecem de novo
-- Após **30 dias**, o produto pode aparecer novamente
-- Você pode marcar manualmente como **Enviado** ou **Ignorado**
-
-### Colunas da planilha:
-| Coluna | Descrição |
-|---|---|
-| Data e hora | Quando a oferta foi encontrada |
-| Pilar | Corrida, Academia ou Complementos |
-| Nome do produto | Nome completo |
-| Preço | Preço com desconto |
-| % de desconto | Percentual de economia |
-| Link | Link de afiliado |
-| Status | Pendente / Enviado / Ignorado |
-
----
-
-## 🏆 Pilares de busca
-
-O bot busca produtos em 3 pilares organizados por prioridade:
-
-### 🏃 Pilar 1 — Corrida
-Tênis de corrida, meias, faixas, relógios GPS, cintos de hidratação, viseiras
-
-### 🏋️ Pilar 2 — Academia & Fitness (alta prioridade)
-Whey protein, creatina, legging, smartband, elásticos, tops fitness, shorts, camisetas dry-fit
-
-### 📱 Pilar 3 — Complementos
-Pré-treino, BCAA, tapetes de yoga, shakers, meias esportivas
-
-> O bot sempre mostra primeiro as ofertas com **maior desconto percentual**
-
----
-
-## ❓ Dúvidas frequentes
-
-**O bot não encontrou ofertas. O que fazer?**
-Verifique se o arquivo `.env` está preenchido corretamente e rode `npm run auth` novamente.
-
-**Os posts estão aparecendo repetidos. O que fazer?**
-Abra a planilha `historico.xlsx` e marque as ofertas já enviadas como **Enviado**. Na próxima vez que rodar, elas não aparecerão.
-
-**Como limpar todo o histórico?**
-Digite `npm run resetar` no terminal.
-
-**Posso usar em outro computador?**
-Sim! Copie toda a pasta `bot-ofertas` para o novo computador, instale o Node.js e rode `npm install`. Depois configure o `.env` com suas credenciais e rode `npm run auth`.
-
-**O link da Amazon aparece longo. É normal?**
-Sim. A Amazon não tem API pública para gerar links curtos, mas seu ID de afiliado está no link e as comissões são rastreadas normalmente.
-
-**Com que frequência devo rodar o bot?**
-Recomendamos 3 vezes por dia: manhã (8h), tarde (12h) e noite (18h), para manter o grupo sempre atualizado com ofertas frescas.
-
----
-
-## 💰 Plataformas de afiliados suportadas
-
-| Plataforma | Status | Comissão estimada |
-|---|---|---|
-| Mercado Livre | ✅ Ativo | Variável por produto |
-| Amazon | ✅ Ativo | 2% a 10% |
-| Shopee | ⚙️ Opcional | Até 10% |
-| Lomadee | ⚙️ Opcional | Variável |
-
----
-
-## 📞 Suporte
-
-Em caso de dúvidas ou erros, abra o Claude Code na pasta do projeto e descreva o problema. O assistente vai ajudar a resolver!
-
----
-
-*Bot desenvolvido com Claude Code — Anthropic*
+```
+index.js        — orquestrador principal e CLI
+scraper.js      — busca ofertas na API do Pelando
+filtro.js       — filtra por esporte, plataforma e desconto; classifica por pilar
+formatador.js   — formata posts com slogans por categoria
+afiliados.js    — gera links de afiliado (ML e Shopee)
+historico.js    — controle de histórico via planilha Excel (ExcelJS)
+agendador.js    — agendamento automático com node-cron
+auth.js         — fluxo OAuth do Mercado Livre (uso avançado)
+```

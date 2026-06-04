@@ -54,20 +54,26 @@ async function buscarPorTermo(termo) {
 
 function normalizarDeal(deal) {
   const sourceUrl = deal.sourceUrl || '';
-  const loja = deal.store?.name || '';
+  const loja      = deal.store?.name || '';
+
+  // Implementação 7 — precoNumerico: valor numérico puro para cálculo de ticket e score.
+  // deal.price já vem numérico da API do Pelando; evita parser de string.
+  const precoNumerico = deal.price != null ? Number(deal.price) : null;
+
   return {
-    id:           deal.id || deal.slug || '',
-    titulo:       deal.title || '',
-    precoPromo:   deal.price != null ? `R$ ${String(deal.price).replace('.', ',')}` : null,
+    id:            deal.id || deal.slug || '',
+    titulo:        deal.title || '',
+    precoPromo:    precoNumerico != null ? `R$ ${String(precoNumerico).replace('.', ',')}` : null,
     precoOriginal: calcularPrecoOriginal(deal),
-    desconto:     deal.discountPercentage ? `${deal.discountPercentage}%` : null,
-    descontoNum:  deal.discountPercentage || 0,
-    link:         deal.redirectUrl || sourceUrl,
+    precoNumerico,
+    desconto:      deal.discountPercentage ? `${deal.discountPercentage}%` : null,
+    descontoNum:   deal.discountPercentage || 0,
+    link:          deal.redirectUrl || sourceUrl,
     sourceUrl,
     loja,
-    plataforma:   detectarPlataforma(sourceUrl, loja),
-    temperatura:  deal.temperature || 0,
-    gratis:       deal.kind === 'free',
+    plataforma:    detectarPlataforma(sourceUrl, loja),
+    temperatura:   deal.temperature || 0,
+    gratis:        deal.kind === 'free',
   };
 }
 
